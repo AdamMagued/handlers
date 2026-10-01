@@ -418,3 +418,84 @@ func TestCORSAllowStar(t *testing.T) {
 		t.Fatalf("bad header: expected %q to be %q, got %q.", corsAllowOriginHeader, want, got)
 	}
 }
+
+func TestCORSHandlerNonUppercaseAllowedMethod(t *testing.T) {
+	const (
+		origin = "https://foo.com"
+		method = "patch"
+	)
+	req := newRequest(http.MethodOptions, "http://example.com/foo")
+	req.Header.Set("Origin", origin)
+	req.Header.Set(corsRequestMethodHeader, method)
+
+	rr := httptest.NewRecorder()
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+
+	cors := CORS(
+		AllowedOrigins([]string{origin}),
+		AllowedMethods([]string{method}),
+	)
+	cors(testHandler).ServeHTTP(rr, req)
+	resp := rr.Result()
+
+	if got, want := resp.StatusCode, http.StatusOK; got != want {
+		t.Fatalf("bad status: got %v want %v", got, want)
+	}
+
+	header := resp.Header.Get(corsAllowMethodsHeader)
+	if got, want := header, method; got != want {
+		t.Fatalf("bad header: expected %q method header, got %q", want, got)
+	}
+}
+
+func TestCORSHandlerCustomMixedCaseAllowedMethod(t *testing.T) {
+	const (
+		origin = "https://foo.com"
+		method = "customMethod"
+	)
+	req := newRequest(http.MethodOptions, "http://example.com/foo")
+	req.Header.Set("Origin", origin)
+	req.Header.Set(corsRequestMethodHeader, method)
+
+	rr := httptest.NewRecorder()
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+
+	cors := CORS(
+		AllowedOrigins([]string{origin}),
+		AllowedMethods([]string{method}),
+	)
+	cors(testHandler).ServeHTTP(rr, req)
+	resp := rr.Result()
+
+	if got, want := resp.StatusCode, http.StatusOK; got != want {
+		t.Fatalf("bad status: got %v want %v", got, want)
+	}
+
+	header := resp.Header.Get(corsAllowMethodsHeader)
+	if got, want := header, method; got != want {
+		t.Fatalf("bad header: expected %q method header, got %q", want, got)
+	}
+}
+
+func TestCORSHandlerCaseSensitiveMethodMismatch(t *testing.T) {
+	const (
+		origin = "https://foo.com"
+	)
+	req := newRequest(http.MethodOptions, "http://example.com/foo")
+	req.Header.Set("Origin", origin)
+	req.Header.Set(corsRequestMethodHeader, "PATCH")
+
+	rr := httptest.NewRecorder()
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+
+	cors := CORS(
+		AllowedOrigins([]string{origin}),
+		AllowedMethods([]string{"patch"}),
+	)
+	cors(testHandler).ServeHTTP(rr, req)
+	resp := rr.Result()
+
+	if got, want := resp.StatusCode, http.StatusMethodNotAllowed; got != want {
+		t.Fatalf("bad status: got %v want %v", got, want)
+	}
+}
