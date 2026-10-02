@@ -48,6 +48,10 @@ const (
 )
 
 func (ch *cors) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if ch.responseVariesByOrigin() {
+		w.Header().Add(corsVaryHeader, corsOriginHeader)
+	}
+
 	origin := r.Header.Get(corsOriginHeader)
 	if !ch.isOriginAllowed(origin) {
 		if r.Method != corsOptionMethod || ch.ignoreOptions {
@@ -107,10 +111,6 @@ func (ch *cors) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if ch.allowCredentials {
 		w.Header().Set(corsAllowCredentialsHeader, "true")
-	}
-
-	if len(ch.allowedOrigins) > 1 {
-		w.Header().Set(corsVaryHeader, corsOriginHeader)
 	}
 
 	returnOrigin := origin
@@ -317,6 +317,13 @@ func AllowCredentials() CORSOption {
 		ch.allowCredentials = true
 		return nil
 	}
+}
+
+// responseVariesByOrigin reports whether the response varies based on the request Origin header.
+// Whenever multiple origins or dynamic origin validation are configured, the response depends
+// on the Origin header and must include Vary: Origin to prevent cache poisoning across origins.
+func (ch *cors) responseVariesByOrigin() bool {
+	return len(ch.allowedOrigins) > 1 || ch.allowedOriginValidator != nil
 }
 
 func (ch *cors) isOriginAllowed(origin string) bool {
